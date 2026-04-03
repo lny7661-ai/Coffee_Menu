@@ -39,7 +39,11 @@ export type ParticipantPick = {
 export type OrderRow = {
   id: string;
   name: string;
-  menu: string;
+  menu_item: string;
   created_at: string;
-  session_id: string;
+  /** 레거시·동기화용 (room_id 와 동일한 UUID 문자열) */
+  session_id?: string;
+  room_id: string;
+  kakao_id?: string | null;
+  updated_at?: string | null;
 };

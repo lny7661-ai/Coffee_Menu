@@ -1,28 +1,42 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
+import { combineCartLinesForOrder } from "@/lib/menu";
+
+export type CartSubmitLine = {
+  menu: string;
+  quantity: number;
+};
 
 type MenuOrderFormProps = {
   sessionId: string;
-  /** Supabase orders.menu 에 저장되는 한 줄 */
-  orderLine: string;
+  cartLines: CartSubmitLine[];
   canSubmit: boolean;
+  /** true면 제출 불가 (취합 마감 등) */
+  sessionClosed?: boolean;
+  kakaoId: string;
+  kakaoNickname: string;
+  /** 있으면 UPDATE, 없으면 INSERT */
+  existingOrderId: string | null;
   onSubmitted?: () => void;
 };
 
 export function MenuOrderForm({
   sessionId,
-  orderLine,
+  cartLines,
   canSubmit,
+  sessionClosed = false,
+  kakaoId,
+  kakaoNickname,
+  existingOrderId,
   onSubmitted,
 }: MenuOrderFormProps) {
   const queryClient = useQueryClient();
-  const [name, setName] = useState("");
+  const isUpdate = Boolean(existingOrderId);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -30,41 +44,70 @@ export function MenuOrderForm({
         throw new Error("Supabase 환경 변수를 .env.local 에 설정해 주세요.");
       }
       const supabase = createBrowserSupabaseClient();
-      const trimmedName = name.trim();
-      if (!trimmedName) {
-        throw new Error("이름을 입력해 주세요.");
+      const name = kakaoNickname.trim();
+      if (!name) {
+        throw new Error("닉네임을 불러오지 못했습니다. 다시 로그인해 주세요.");
       }
-      if (!orderLine.trim()) {
-        throw new Error("메뉴를 선택해 주세요.");
+      const menuText = combineCartLinesForOrder(cartLines);
+      if (!menuText.trim()) {
+        throw new Error("장바구니에 메뉴를 담아 주세요.");
       }
-      const { error } = await supabase.from("orders").insert({
-        name: trimmedName,
-        menu: orderLine.trim(),
-        session_id: sessionId,
-      });
-      if (error) throw error;
+
+      if (existingOrderId) {
+        const { error } = await supabase
+          .from("orders")
+          .update({
+            name,
+            menu_item: menuText,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingOrderId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("orders").insert({
+          session_id: sessionId,
+          room_id: sessionId,
+          name,
+          menu_item: menuText,
+          kakao_id: kakaoId,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["orders", sessionId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["myOrder", sessionId, kakaoId],
+      });
       onSubmitted?.();
     },
   });
 
   const supabaseReady = isSupabaseConfigured();
+  const blocked = sessionClosed;
 
   return (
     <form
       className="rounded-2xl border border-zinc-200/90 bg-white p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!canSubmit || !name.trim()) return;
+        if (blocked || !canSubmit) return;
         mutation.mutate();
       }}
     >
-      <h2 className="text-sm font-semibold text-zinc-900">주문 입력</h2>
+      <h2 className="text-sm font-semibold text-zinc-900">
+        {isUpdate ? "메뉴 수정" : "주문 입력"}
+      </h2>
       <p className="mt-1 text-xs text-zinc-400">
-        이름을 입력하고 선택 완료를 누르면 취합 목록에 반영됩니다.
+        {isUpdate
+          ? "장바구니를 수정한 뒤 아래 버튼으로 저장하세요."
+          : "카카오 닉네임으로 취합 목록에 반영됩니다."}
       </p>
+      {blocked ? (
+        <p className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-600">
+          주최자가 취합을 마감했습니다. 더 이상 주문할 수 없습니다.
+        </p>
+      ) : null}
 
       {!supabaseReady && (
         <p className="mt-3 rounded-lg border border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
@@ -72,17 +115,10 @@ export function MenuOrderForm({
         </p>
       )}
 
-      <label className="mt-4 block text-sm font-medium text-zinc-700">
-        이름
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="홍길동"
-          className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-zinc-900 outline-none ring-zinc-900/5 placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
-          autoComplete="name"
-        />
-      </label>
+      <p className="mt-4 text-sm text-zinc-700">
+        <span className="font-medium text-zinc-900">{kakaoNickname}</span>
+        <span className="text-zinc-500"> 님으로 저장됩니다</span>
+      </p>
 
       {mutation.isError && (
         <p className="mt-3 text-sm text-red-600" role="alert">
@@ -94,10 +130,14 @@ export function MenuOrderForm({
 
       <button
         type="submit"
-        disabled={mutation.isPending || !canSubmit || !name.trim()}
+        disabled={blocked || mutation.isPending || !canSubmit}
         className="mt-5 w-full rounded-xl bg-zinc-900 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {mutation.isPending ? "저장 중…" : "선택 완료"}
+        {mutation.isPending
+          ? "저장 중…"
+          : isUpdate
+            ? "수정 완료"
+            : "선택 완료"}
       </button>
     </form>
   );

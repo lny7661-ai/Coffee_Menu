@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft, Users } from "lucide-react";
 import { MobileShell } from "@/components/mobile-shell";
-import { OrdersList } from "@/components/orders-list";
+import { HostSessionBoardTitle } from "@/components/host-session-board-title";
+import { HostRoomDashboard } from "@/components/host-room-dashboard";
 
 type PageProps = {
   params: Promise<{ sessionId: string }>;
@@ -21,12 +22,7 @@ export default async function HostSessionPage({ params }: PageProps) {
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </Link>
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-400">
-              취합 현황
-            </p>
-            <h1 className="text-lg font-semibold text-zinc-900">참가 메뉴</h1>
-          </div>
+          <HostSessionBoardTitle sessionId={sessionId} />
         </div>
       </header>
 
@@ -40,7 +36,7 @@ export default async function HostSessionPage({ params }: PageProps) {
           </span>
         </div>
 
-        <OrdersList sessionId={sessionId} />
+        <HostRoomDashboard roomId={sessionId} />
       </main>
     </MobileShell>
   );

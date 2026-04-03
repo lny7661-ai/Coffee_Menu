@@ -19,6 +19,8 @@ type MenuOptionSheetProps = {
   open: boolean;
   onClose: () => void;
   onChange: (next: OrderOptions) => void;
+  /** 있으면 하단 버튼이 장바구니 담기로 바뀌고, 클릭 시 호출 후 시트 닫힘 */
+  onAddToCart?: () => void;
 };
 
 function TempButton({
@@ -51,6 +53,7 @@ export function MenuOptionSheet({
   open,
   onClose,
   onChange,
+  onAddToCart,
 }: MenuOptionSheetProps) {
   if (!open) return null;
 
@@ -219,10 +222,13 @@ export function MenuOptionSheet({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              onAddToCart?.();
+              onClose();
+            }}
             className="mt-4 w-full rounded-xl bg-zinc-900 py-3.5 text-sm font-semibold text-white hover:bg-zinc-800"
           >
-            확인
+            {onAddToCart ? "장바구니에 담기" : "확인"}
           </button>
         </div>
       </div>

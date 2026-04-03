@@ -97,6 +97,23 @@ export function formatOrderLine(
   return parts.join(" · ");
 }
 
+/** Supabase orders.menu_item 한 필드에 담을 때 (줄바꿈으로 구분) */
+export function combineCartLinesForOrder(
+  lines: { menu: string; quantity: number }[],
+): string {
+  return lines
+    .map(({ menu, quantity }) =>
+      quantity > 1 ? `${menu} (×${quantity})` : menu,
+    )
+    .join("\n");
+}
+
+/** 장바구니 줄 병합용 키 (같은 메뉴·옵션이면 수량만 증가) */
+export function cartLineKey(product: MenuProduct, options: OrderOptions): string {
+  const o = clampOrderOptions(product, options);
+  return `${product.id}:${o.temperature}:${o.milk}:${o.extraShot}:${o.decaf}`;
+}
+
 /** 기타 메뉴 직접 입력 — 비어 있으면 빈 문자열 */
 export function formatCustomOrderLine(detail: string): string {
   const trimmed = detail.trim();

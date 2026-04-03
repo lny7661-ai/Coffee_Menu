@@ -5,12 +5,12 @@ import { Providers } from "@/app/providers";
 import { KakaoSdkScript } from "@/components/kakao-sdk-script";
 
 export const metadata: Metadata = {
-  title: "커피 메뉴 취합",
+  title: "Paul Bassett Menu",
   description:
-    "모바일에서 카카오톡으로 공유하고, 참가자 메뉴를 한눈에 모으는 커피 메뉴 취합 앱",
+    "한화토탈에너지스 대산공장점 · 모바일에서 카카오톡으로 공유하고 참가자 메뉴를 한눈에 모으는 메뉴 취합",
   appleWebApp: {
     capable: true,
-    title: "커피 메뉴 취합",
+    title: "Paul Bassett Menu",
     statusBarStyle: "default",
   },
 };
