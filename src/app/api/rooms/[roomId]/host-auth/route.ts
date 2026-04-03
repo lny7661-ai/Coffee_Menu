@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
-import { createServiceSupabaseClient, isServiceSupabaseConfigured } from "@/lib/supabase/admin";
+import { isServiceSupabaseConfigured } from "@/lib/supabase/admin";
 import { hostAuthClearCookieHeader, hostAuthCookieHeader } from "@/lib/host-auth-cookie";
+import { verifyRoomHostPassword } from "@/lib/server/verify-room-host-password";
 
 export const runtime = "nodejs";
 
+/**
+ * 방 비밀번호 검증 — DB 해시는 service_role 로만 읽고 bcrypt 로 비교합니다.
+ * 성공 시 HttpOnly 쿠키만 설정합니다(주문 본문 없음).
+ */
 export async function POST(
   req: Request,
   context: { params: Promise<{ roomId: string }> },
@@ -31,19 +35,12 @@ export async function POST(
   }
 
   try {
-    const supabase = createServiceSupabaseClient();
-    const { data, error } = await supabase
-      .from("rooms")
-      .select("password_hash")
-      .eq("id", roomId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data?.password_hash) {
-      return NextResponse.json({ error: "방을 찾을 수 없습니다." }, { status: 404 });
-    }
-    const ok = await bcrypt.compare(password, data.password_hash as string);
-    if (!ok) {
-      return NextResponse.json({ error: "비밀번호가 올바르지 않습니다." }, { status: 401 });
+    const result = await verifyRoomHostPassword(roomId, password);
+    if (!result.verified) {
+      return NextResponse.json(
+        { error: result.message },
+        { status: result.status },
+      );
     }
   } catch (e) {
     console.error(e);

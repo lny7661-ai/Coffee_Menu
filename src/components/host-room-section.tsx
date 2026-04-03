@@ -164,31 +164,43 @@ export function HostRoomSection() {
       {!sessionId ? (
         <>
           <label className="mt-4 block text-sm font-medium text-zinc-700">
-            방 비밀번호
+            방 비밀번호 (숫자만)
             <input
-              type="password"
+              type="text"
+              name="room-pin"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              enterKeyHint="done"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               value={roomPassword}
               onChange={(e) => {
-                setRoomPassword(e.target.value);
+                setRoomPassword(e.target.value.replace(/\D/g, ""));
                 setPasswordError(null);
               }}
-              placeholder="4자 이상"
-              autoComplete="new-password"
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+              placeholder="숫자 4자리 이상"
+              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm tabular-nums text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10 [-webkit-text-security:disc]"
             />
           </label>
           <label className="mt-3 block text-sm font-medium text-zinc-700">
             비밀번호 확인
             <input
-              type="password"
+              type="text"
+              name="room-pin-confirm"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              enterKeyHint="done"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
               value={roomPasswordConfirm}
               onChange={(e) => {
-                setRoomPasswordConfirm(e.target.value);
+                setRoomPasswordConfirm(e.target.value.replace(/\D/g, ""));
                 setPasswordError(null);
               }}
-              placeholder="한 번 더 입력"
-              autoComplete="new-password"
-              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
+              placeholder="숫자 한 번 더"
+              className="mt-1 w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 tabular-nums outline-none placeholder:text-zinc-400 focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10 [-webkit-text-security:disc]"
             />
           </label>
           {passwordError ? (

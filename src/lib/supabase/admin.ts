@@ -1,8 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
 /**
- * 서버 전용 — RLS 를 우회해 방장/통계 API에서만 사용.
- * `SUPABASE_SERVICE_ROLE_KEY` 는 클라이언트 번들에 넣지 마세요.
+ * 서버 전용 — Route Handler·Server Action 등에서만 import 하세요.
+ * RLS 를 우회하므로 **비밀번호 해시·주문 상세** 조회는 반드시 이 클라이언트로만 수행합니다.
+ * `SUPABASE_SERVICE_ROLE_KEY` 는 `.env.local` 에만 두고 클라이언트 번들에 노출하지 마세요.
  */
 export function createServiceSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

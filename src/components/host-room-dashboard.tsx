@@ -68,20 +68,24 @@ export function HostRoomDashboard({ roomId }: { roomId: string }) {
 
   const loginMutation = useMutation({
     mutationFn: async (pw: string) => {
-      const r = await fetch(`/api/rooms/${roomId}/host-auth`, {
+      const r = await fetch(`/api/rooms/${roomId}/host-orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ password: pw }),
       });
-      const j = (await r.json().catch(() => ({}))) as { error?: string };
+      const j = (await r.json().catch(() => ({}))) as {
+        error?: string;
+        orders?: OrderRow[];
+      };
       if (!r.ok) throw new Error(j.error ?? "로그인에 실패했습니다.");
+      return { orders: j.orders ?? [] } as HostOrdersPayload;
     },
-    onSuccess: async () => {
+    onSuccess: async (data) => {
       setPwOpen(false);
       setPassword("");
       setPwError(null);
-      await queryClient.invalidateQueries({ queryKey: ["hostOrders", roomId] });
+      queryClient.setQueryData(["hostOrders", roomId], data);
     },
     onError: (e: Error) => {
       setPwError(e.message);
@@ -195,6 +199,7 @@ export function HostRoomDashboard({ roomId }: { roomId: string }) {
               }}
               className="mt-4 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-900/10"
               placeholder="비밀번호"
+              autoComplete="current-password"
             />
             {pwError ? (
               <p className="mt-2 text-sm text-red-600" role="alert">

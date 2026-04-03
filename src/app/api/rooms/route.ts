@@ -25,9 +25,9 @@ export async function POST(req: Request) {
   if (!room_name) {
     return NextResponse.json({ error: "방 이름을 입력해 주세요." }, { status: 400 });
   }
-  if (password.length < 4) {
+  if (!/^\d{4,}$/.test(password)) {
     return NextResponse.json(
-      { error: "비밀번호는 4자 이상으로 설정해 주세요." },
+      { error: "비밀번호는 숫자 4자리 이상으로 설정해 주세요." },
       { status: 400 },
     );
   }
