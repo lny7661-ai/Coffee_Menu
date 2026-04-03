@@ -1,7 +1,8 @@
-export type Temperature = "ice" | "hot";
+import type { MilkOption, Temperature } from "@/lib/types/menu-product";
 
-export type MilkOption = "regular" | "soy" | "oat";
+export type { MilkOption, Temperature } from "@/lib/types/menu-product";
 
+/** 레거시·호환용 (고정 조합 한 줄) */
 export type MenuItem = {
   id: string;
   name: string;
@@ -13,9 +14,21 @@ export type MenuItem = {
 export type OrderSession = {
   id: string;
   title: string;
-  menu: MenuItem[];
   createdAt: string;
 };
+
+export type {
+  MenuCategory,
+  MenuProduct,
+  OrderOptions,
+  ProductModifierFlags,
+  TemperatureMode,
+} from "@/lib/types/menu-product";
+export {
+  DECAF_PRICE,
+  EXTRA_SHOT_PRICE,
+  MILK_SWAP_PRICE,
+} from "@/lib/types/menu-product";
 
 export type ParticipantPick = {
   participantId: string;

@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
+import {
+  getKakaoJavaScriptKey,
+  initKakaoSdkWhenReady,
+} from "@/lib/kakao/init-kakao-sdk";
 
 const PLACEHOLDER_IMAGE =
   "https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png";
@@ -25,23 +29,24 @@ export function KakaoShareButton({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const key = process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY;
-    if (!key || typeof window === "undefined") return;
-    let attempts = 0;
-    const maxAttempts = 120;
-    const id = window.setInterval(() => {
-      attempts += 1;
-      if (window.Kakao) {
-        if (!window.Kakao.isInitialized()) {
-          window.Kakao.init(key);
-        }
-        setReady(true);
-        window.clearInterval(id);
-      } else if (attempts >= maxAttempts) {
-        window.clearInterval(id);
-      }
-    }, 50);
-    return () => window.clearInterval(id);
+    let cancelled = false;
+    const markReadyIfKakao = () => {
+      if (cancelled) return;
+      if (window.Kakao?.isInitialized()) setReady(true);
+    };
+
+    markReadyIfKakao();
+    window.addEventListener("kakao-sdk-ready", markReadyIfKakao);
+
+    void (async () => {
+      const ok = await initKakaoSdkWhenReady();
+      if (!cancelled && ok) setReady(true);
+    })();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("kakao-sdk-ready", markReadyIfKakao);
+    };
   }, []);
 
   const handleShare = useCallback(() => {
@@ -72,13 +77,13 @@ export function KakaoShareButton({
     });
   }, [shareUrl, title, description]);
 
-  const hasKey = Boolean(process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY);
+  const hasKey = Boolean(getKakaoJavaScriptKey());
 
   return (
     <div className="space-y-2">
       {!hasKey && (
-        <p className="text-xs text-amber-800">
-          NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY 를 설정하면 공유할 수 있어요.
+        <p className="text-xs text-zinc-500">
+          NEXT_PUBLIC_KAKAO_JS_KEY 를 설정하면 공유할 수 있어요.
         </p>
       )}
       <button

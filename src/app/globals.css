@@ -2,9 +2,11 @@
 @import "pretendard/dist/web/static/pretendard.css";
 
 :root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
-  --app-surface: #fafaf9;
+  --background: #f4f4f5;
+  --foreground: #18181b;
+  --app-surface: #ffffff;
+  --border-subtle: rgba(24, 24, 27, 0.08);
+  --border-strong: rgba(24, 24, 27, 0.12);
 }
 
 @theme inline {
