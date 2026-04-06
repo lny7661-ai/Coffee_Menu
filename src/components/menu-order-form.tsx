@@ -18,6 +18,8 @@ type MenuOrderFormProps = {
   canSubmit: boolean;
   /** true면 제출 불가 (취합 마감 등) */
   sessionClosed?: boolean;
+  /** 이 기기에서 연 방 주최자 미리보기 — 메뉴는 보이되 주문 저장 불가 */
+  hostPreview?: boolean;
   kakaoId: string;
   kakaoNickname: string;
   /** 있으면 UPDATE, 없으면 INSERT */
@@ -30,6 +32,7 @@ export function MenuOrderForm({
   cartLines,
   canSubmit,
   sessionClosed = false,
+  hostPreview = false,
   kakaoId,
   kakaoNickname,
   existingOrderId,
@@ -40,6 +43,9 @@ export function MenuOrderForm({
 
   const mutation = useMutation({
     mutationFn: async () => {
+      if (hostPreview) {
+        throw new Error("주최자 미리보기 모드에서는 저장할 수 없습니다. 카카오 로그인 후 주문해 주세요.");
+      }
       if (!isSupabaseConfigured()) {
         throw new Error("Supabase 환경 변수를 .env.local 에 설정해 주세요.");
       }
@@ -84,7 +90,7 @@ export function MenuOrderForm({
   });
 
   const supabaseReady = isSupabaseConfigured();
-  const blocked = sessionClosed;
+  const blocked = sessionClosed || hostPreview;
 
   return (
     <form
@@ -103,9 +109,15 @@ export function MenuOrderForm({
           ? "장바구니를 수정한 뒤 아래 버튼으로 저장하세요."
           : "카카오 닉네임으로 취합 목록에 반영됩니다."}
       </p>
-      {blocked ? (
+      {sessionClosed ? (
         <p className="mt-3 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-medium text-zinc-600">
           주최자가 취합을 마감했습니다. 더 이상 주문할 수 없습니다.
+        </p>
+      ) : null}
+      {hostPreview ? (
+        <p className="mt-3 rounded-lg border border-amber-200/90 bg-amber-50/90 px-3 py-2 text-xs font-medium text-amber-950">
+          주최자 미리보기입니다. 메뉴는 볼 수 있으며, 실제 주문·취합 반영은 아래에서 카카오 로그인 후
+          진행해 주세요.
         </p>
       ) : null}
 
@@ -117,7 +129,9 @@ export function MenuOrderForm({
 
       <p className="mt-4 text-sm text-zinc-700">
         <span className="font-medium text-zinc-900">{kakaoNickname}</span>
-        <span className="text-zinc-500"> 님으로 저장됩니다</span>
+        <span className="text-zinc-500">
+          {hostPreview ? " 님(주최자 미리보기)" : " 님으로 저장됩니다"}
+        </span>
       </p>
 
       {mutation.isError && (
@@ -133,11 +147,13 @@ export function MenuOrderForm({
         disabled={blocked || mutation.isPending || !canSubmit}
         className="mt-5 w-full rounded-xl bg-zinc-900 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {mutation.isPending
-          ? "저장 중…"
-          : isUpdate
-            ? "수정 완료"
-            : "선택 완료"}
+        {hostPreview
+          ? "미리보기 — 저장 불가"
+          : mutation.isPending
+            ? "저장 중…"
+            : isUpdate
+              ? "수정 완료"
+              : "선택 완료"}
       </button>
     </form>
   );

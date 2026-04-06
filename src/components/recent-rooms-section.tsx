@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, History, X } from "lucide-react";
+import { ChevronRight, History } from "lucide-react";
+import { RoomStatusBadge } from "@/components/room-status-badge";
+import { useSessionClosuresMap } from "@/hooks/useSessionClosure";
 import {
-  clearAllSavedSessions,
   displayHostName,
   getSavedSessions,
   type SavedSession,
@@ -47,11 +48,8 @@ export function RecentRoomsSection() {
     };
   }, [refresh]);
 
-  const clearHistory = () => {
-    if (!window.confirm("정말 삭제하시겠어요?")) return;
-    clearAllSavedSessions();
-    window.dispatchEvent(new Event("saved-sessions-changed"));
-  };
+  const ids = sessions.map((s) => s.id);
+  const { closedByRoomId } = useSessionClosuresMap(ids);
 
   return (
     <section className="relative rounded-2xl border border-zinc-200/90 bg-zinc-50/50 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
@@ -60,16 +58,6 @@ export function RecentRoomsSection() {
           <History className="h-4 w-4 text-zinc-500" strokeWidth={2} />
           최근에 만든 방
         </h2>
-        {sessions.length > 0 ? (
-          <button
-            type="button"
-            onClick={clearHistory}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-zinc-400 transition hover:bg-zinc-200/80 hover:text-zinc-600"
-            aria-label="최근 방 기록 전체 삭제"
-          >
-            <X className="h-4 w-4" strokeWidth={2} />
-          </button>
-        ) : null}
       </div>
       {sessions.length === 0 ? (
         <p className="mt-3 text-xs text-zinc-400">
@@ -78,27 +66,35 @@ export function RecentRoomsSection() {
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
-          {sessions.slice(0, 8).map((s) => (
-            <li key={s.id}>
-              <Link
-                href={`/host/session/${s.id}`}
-                className="flex items-center justify-between gap-2 rounded-xl border border-zinc-200/80 bg-white px-3 py-2.5 text-left transition hover:border-zinc-300 hover:bg-zinc-50/80"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium text-zinc-800">
-                    {s.label}
+          {sessions.slice(0, 8).map((s) => {
+            const closed = Boolean(closedByRoomId[s.id]);
+            return (
+              <li key={s.id}>
+                <Link
+                  href={`/host/session/${s.id}`}
+                  className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition hover:border-zinc-300 ${
+                    closed
+                      ? "border-zinc-300 bg-zinc-200/60 hover:bg-zinc-200/80"
+                      : "border-zinc-200/80 bg-white hover:bg-zinc-50/80"
+                  }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="block truncate text-sm font-medium text-zinc-800">
+                        {s.label}
+                      </span>
+                      <RoomStatusBadge closed={closed} />
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] text-zinc-500">
+                      {`${displayHostName(s.createdBy)} · `}
+                      {formatCreated(s.createdAt)}
+                    </span>
                   </span>
-                  <span className="mt-0.5 block truncate text-[11px] text-zinc-500">
-                    {`${displayHostName(s.createdBy)} · `}
-                    {formatCreated(s.createdAt)}
-                  </span>
-                </span>
-                <span className="flex shrink-0 items-center gap-1 text-zinc-400">
-                  <ChevronRight className="h-3.5 w-3.5 text-zinc-300" />
-                </span>
-              </Link>
-            </li>
-          ))}
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-zinc-300" />
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

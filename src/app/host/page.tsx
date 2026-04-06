@@ -4,6 +4,9 @@ import { MobileShell } from "@/components/mobile-shell";
 import { HostRoomSection } from "@/components/host-room-section";
 import { HostSavedSessionsList } from "@/components/host-saved-sessions-list";
 
+/** 요청마다 env 를 읽어 `.env.local` 의 서버 키가 정적 HTML 에 박히지 않게 합니다. */
+export const dynamic = "force-dynamic";
+
 export default function HostPage() {
   return (
     <MobileShell>

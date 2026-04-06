@@ -1,5 +1,8 @@
 const STORAGE_KEY = "cafe_menu_saved_sessions_v1";
 
+/** 주최자 미리보기 전용 — DB 주문에 쓰이지 않는 플레이스홀더 kakao_id */
+export const HOST_PREVIEW_KAKAO_ID = "__cafe_menu_host_preview__";
+
 export type SavedSession = {
   id: string;
   label: string;
@@ -55,10 +58,21 @@ export function getSavedSession(id: string): SavedSession | undefined {
   return readRaw().find((s) => s.id === id);
 }
 
+/** 동기. localStorage 실패 시 예외를 던질 수 있음(용량·보안 컨텍스트 등). */
 export function upsertSavedSession(entry: SavedSession) {
   const list = readRaw().filter((s) => s.id !== entry.id);
   list.push(entry);
   writeRaw(list);
+}
+
+/** 예외 삼킴 — UI 상태(setSessionId)는 저장 실패와 무관하게 진행할 때 사용 */
+export function tryUpsertSavedSession(entry: SavedSession): boolean {
+  try {
+    upsertSavedSession(entry);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function updateSavedSessionLabel(id: string, label: string) {
@@ -110,5 +124,10 @@ export function hasDuplicateSessionLabel(
 
 export function clearAllSavedSessions() {
   writeRaw([]);
+}
+
+export function removeSavedSession(id: string) {
+  const list = readRaw().filter((s) => s.id !== id);
+  writeRaw(list);
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useQuery, useQueryClient, useMutation, useQueries } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
 import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
@@ -10,6 +10,47 @@ import {
 function getClient() {
   if (!isSupabaseConfigured()) return null;
   return createBrowserSupabaseClient();
+}
+
+function stableSortedRoomIdsKey(roomIds: string[]): string {
+  return [...new Set(roomIds.filter(Boolean))].sort().join("\u0001");
+}
+
+/** 여러 방의 마감 여부(모집완료)를 한 번에 조회 */
+export function useSessionClosuresMap(roomIds: string[]) {
+  const idsKey = stableSortedRoomIdsKey(roomIds);
+  const ids = useMemo(() => idsKey.split("\u0001").filter(Boolean), [idsKey]);
+
+  const queries = useQueries({
+    queries: ids.map((sessionId) => ({
+      queryKey: ["sessionClosure", sessionId] as const,
+      enabled: Boolean(sessionId) && isSupabaseConfigured(),
+      queryFn: async (): Promise<string | null> => {
+        const supabase = createBrowserSupabaseClient();
+        const { data, error } = await supabase
+          .from("session_closures")
+          .select("closed_at")
+          .eq("session_id", sessionId)
+          .maybeSingle();
+        if (error) {
+          console.warn("session_closures 조회 실패:", error.message);
+          return null;
+        }
+        return data?.closed_at ?? null;
+      },
+    })),
+  });
+
+  const closedByRoomId = useMemo(() => {
+    const m: Record<string, boolean> = {};
+    ids.forEach((id, i) => {
+      m[id] = Boolean(queries[i]?.data);
+    });
+    return m;
+  }, [ids, queries]);
+
+  const isLoading = queries.some((q) => q.isPending);
+  return { closedByRoomId, isLoading };
 }
 
 export function useSessionClosure(sessionId: string) {

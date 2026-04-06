@@ -27,6 +27,11 @@ import {
   loadStoredKakaoProfile,
   type KakaoParticipantProfile,
 } from "@/lib/kakao/kakao-auth";
+import {
+  displayHostName,
+  getSavedSession,
+  HOST_PREVIEW_KAKAO_ID,
+} from "@/lib/saved-sessions";
 
 type OrderSessionClientProps = {
   sessionId: string;
@@ -85,6 +90,8 @@ export function OrderSessionClient({ sessionId }: OrderSessionClientProps) {
 
   const [hydrated, setHydrated] = useState(false);
   const [profile, setProfile] = useState<KakaoParticipantProfile | null>(null);
+  /** true면 이 기기에 저장된 방이 있어도 카카오 로그인 화면을 띄움 */
+  const [skipHostPreview, setSkipHostPreview] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
   const [category, setCategory] = useState<MenuCategory>(CATEGORY_ORDER[0]);
@@ -98,14 +105,32 @@ export function OrderSessionClient({ sessionId }: OrderSessionClientProps) {
   const [cart, setCart] = useState<CartEntry[]>([]);
 
   useEffect(() => {
-    setProfile(loadStoredKakaoProfile());
+    const kakao = loadStoredKakaoProfile();
+    if (kakao) {
+      setProfile(kakao);
+      setHydrated(true);
+      return;
+    }
+    if (!skipHostPreview) {
+      const saved = getSavedSession(sessionId);
+      if (saved) {
+        setProfile({
+          id: HOST_PREVIEW_KAKAO_ID,
+          nickname: displayHostName(saved.createdBy),
+        });
+        setHydrated(true);
+        return;
+      }
+    }
+    setProfile(null);
     setHydrated(true);
-  }, []);
+  }, [sessionId, skipHostPreview]);
 
   const kakaoId = profile?.id ?? null;
+  const isHostPreview = kakaoId === HOST_PREVIEW_KAKAO_ID;
   const { data: myOrder, isLoading: myOrderLoading } = useMyOrder(
     sessionId,
-    hydrated ? kakaoId : null,
+    hydrated && !isHostPreview ? kakaoId : null,
   );
 
   const visibleProducts = useMemo(
@@ -123,6 +148,9 @@ export function OrderSessionClient({ sessionId }: OrderSessionClientProps) {
   );
 
   const canSubmit = cart.length > 0 && cart.some((c) => c.quantity > 0);
+  /** 내 주문 행 조회 전에는 INSERT 금지(중복 행 방지). 수정 모드는 이미 id 를 알고 있음. */
+  const canSubmitOrder =
+    isHostPreview || editMode || !myOrderLoading;
 
   const openProduct = (product: MenuProduct) => {
     if (sessionClosed) return;
@@ -182,34 +210,82 @@ export function OrderSessionClient({ sessionId }: OrderSessionClientProps) {
       <KakaoLoginGate
         sessionClosed={sessionClosed}
         onLoggedIn={setProfile}
+        onBrowseWithoutLogin={
+          sessionClosed
+            ? undefined
+            : () => {
+                setSkipHostPreview(false);
+                const saved = getSavedSession(sessionId);
+                setProfile({
+                  id: HOST_PREVIEW_KAKAO_ID,
+                  nickname: saved
+                    ? displayHostName(saved.createdBy)
+                    : "메뉴 확인",
+                });
+              }
+        }
       />
     );
   }
 
-  if (myOrderLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center px-4 py-16">
-        <p className="text-sm text-zinc-500">주문 내역을 불러오는 중…</p>
-      </div>
-    );
-  }
-
+  /** 주문 조회가 끝난 뒤에만 「이미 선택한 메뉴」 카드 표시. 로딩 중에는 메뉴 그리드를 막지 않음(Supabase 지연·실패 대비). */
   const hasOrder = Boolean(myOrder);
-  const showSummary = hasOrder && !editMode;
+  const showSummary =
+    !isHostPreview && !myOrderLoading && hasOrder && !editMode;
   /** 수정 모드에서만 기존 행 UPDATE */
   const formExistingId = editMode ? (myOrder?.id ?? null) : null;
 
   return (
     <div className="flex flex-1 flex-col gap-5 px-4 py-5">
-      <p className="text-xs text-zinc-500">
-        <span className="font-medium text-zinc-700">{profile.nickname}</span>
-        님으로 참여 중
-      </p>
+      <div className="flex flex-col gap-2">
+        <p className="text-xs text-zinc-500">
+          {isHostPreview ? (
+            <>
+              <span className="font-medium text-amber-800">
+                {profile.nickname === "메뉴 확인"
+                  ? "메뉴 미리보기"
+                  : "주최자 미리보기"}
+              </span>
+              <span> · </span>
+              <span className="font-medium text-zinc-700">{profile.nickname}</span>
+              <span>
+                {profile.nickname === "메뉴 확인"
+                  ? " (저장·주문은 카카오 로그인 후)"
+                  : " 님 기준으로 메뉴만 확인 중"}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-medium text-zinc-700">{profile.nickname}</span>
+              님으로 참여 중
+            </>
+          )}
+        </p>
+        {isHostPreview ? (
+          <button
+            type="button"
+            onClick={() => {
+              setSkipHostPreview(true);
+              setProfile(null);
+            }}
+            className="self-start text-xs font-semibold text-zinc-600 underline-offset-2 hover:text-zinc-900 hover:underline"
+          >
+            카카오 로그인하고 실제 주문하기
+          </button>
+        ) : null}
+      </div>
 
       {sessionClosed ? (
         <p className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5 text-sm font-medium text-zinc-700">
           이 방은 취합이 마감되었습니다. 메뉴는 볼 수 있지만 주문은 제출할 수
           없습니다.
+        </p>
+      ) : null}
+
+      {!isHostPreview && myOrderLoading ? (
+        <p className="text-xs text-zinc-400">
+          이전에 고른 메뉴가 있는지 확인하는 중… 메뉴는 아래에서 바로 고를 수
+          있어요.
         </p>
       ) : null}
 
@@ -313,8 +389,9 @@ export function OrderSessionClient({ sessionId }: OrderSessionClientProps) {
           <MenuOrderForm
             sessionId={sessionId}
             cartLines={cartLinesForSubmit}
-            canSubmit={canSubmit}
+            canSubmit={canSubmit && canSubmitOrder}
             sessionClosed={sessionClosed}
+            hostPreview={isHostPreview}
             kakaoId={profile.id}
             kakaoNickname={profile.nickname}
             existingOrderId={formExistingId}

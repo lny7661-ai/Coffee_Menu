@@ -8,11 +8,14 @@ import { getKakaoJavaScriptKey } from "@/lib/kakao/init-kakao-sdk";
 type KakaoLoginGateProps = {
   sessionClosed: boolean;
   onLoggedIn: (p: KakaoParticipantProfile) => void;
+  /** 카카오 없이 메뉴·장바구니만 확인 (주문 저장은 불가 — 로그인 후 가능) */
+  onBrowseWithoutLogin?: () => void;
 };
 
 export function KakaoLoginGate({
   sessionClosed,
   onLoggedIn,
+  onBrowseWithoutLogin,
 }: KakaoLoginGateProps) {
   const hasKey = Boolean(getKakaoJavaScriptKey());
 
@@ -43,7 +46,8 @@ export function KakaoLoginGate({
           카카오로 시작하기
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-zinc-500">
-          로그인하면 본인 메뉴만 안전하게 저장·수정할 수 있어요.
+          참가해 주문하려면 카카오 로그인이 필요해요. 메뉴만 둘러보려면 아래에서
+          로그인 없이 들어갈 수 있어요.
         </p>
         {!hasKey ? (
           <p className="mt-4 text-xs text-amber-700">
@@ -59,6 +63,22 @@ export function KakaoLoginGate({
             카카오로 로그인하고 시작하기
           </button>
         )}
+        {onBrowseWithoutLogin ? (
+          <button
+            type="button"
+            disabled={sessionClosed}
+            onClick={onBrowseWithoutLogin}
+            className="mt-3 w-full rounded-xl border border-zinc-200 bg-white py-3 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            카카오 없이 메뉴만 보기
+          </button>
+        ) : null}
+        {onBrowseWithoutLogin ? (
+          <p className="mt-2 text-center text-xs text-zinc-400">
+            이 모드에서는 장바구니는 쓸 수 있어도 주문 저장은 되지 않아요. 저장하려면
+            위에서 카카오 로그인을 해 주세요.
+          </p>
+        ) : null}
       </div>
     </div>
   );
