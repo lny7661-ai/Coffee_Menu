@@ -1,5 +1,5 @@
 import type { KakaoUserMeResponse } from "@/types/kakao";
-import { initKakaoSdkWhenReady } from "@/lib/kakao/init-kakao-sdk";
+import { ensureKakaoReadyForLogin } from "@/lib/kakao/init-kakao-sdk";
 
 export type KakaoParticipantProfile = {
   id: string;
@@ -48,17 +48,24 @@ function parseUserMe(res: KakaoUserMeResponse): KakaoParticipantProfile {
  * 카카오 로그인 후 사용자 id·닉네임. SDK 로드·init 후 호출.
  */
 export async function loginWithKakao(): Promise<KakaoParticipantProfile> {
-  const ok = await initKakaoSdkWhenReady();
-  if (!ok || typeof window === "undefined") {
-    throw new Error("카카오 SDK 를 불러오지 못했습니다.");
+  if (typeof window === "undefined") {
+    throw new Error("카카오 로그인은 브라우저에서만 가능합니다.");
   }
+  await ensureKakaoReadyForLogin();
   const Kakao = window.Kakao;
-  if (!Kakao?.Auth?.login || !Kakao.API?.request) {
+  if (!Kakao) {
+    throw new Error("카카오 SDK 객체(window.Kakao)가 없습니다.");
+  }
+  if (!Kakao.isInitialized()) {
+    throw new Error("카카오 SDK 가 초기화되지 않았습니다.");
+  }
+  if (!Kakao.Auth?.login || !Kakao.API?.request) {
     throw new Error("카카오 로그인 API 를 사용할 수 없습니다.");
   }
 
   await new Promise<void>((resolve, reject) => {
     Kakao.Auth.login({
+      scope: "profile_nickname",
       success: () => resolve(),
       fail: (err) =>
         reject(err instanceof Error ? err : new Error(String(err))),

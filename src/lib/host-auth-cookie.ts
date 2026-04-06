@@ -1,15 +1,63 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { loadEnvConfig } from "@next/env";
+import { getEnvLocalMapFromDisk, mergeEnvLocalFromDisk } from "@/lib/server/merge-env-local";
 
 const COOKIE_NAME = "cafe_host_room";
 
+/** PC/모바일 공통: 사이트 전역에서 호스트 인증 유지 */
+const HOST_AUTH_COOKIE_FIXED = "Path=/; HttpOnly; SameSite=Lax";
+
 export { COOKIE_NAME };
 
+function refreshEnvForHostSecret(): void {
+  const cwd = process.cwd();
+  loadEnvConfig(cwd);
+  mergeEnvLocalFromDisk(cwd);
+}
+
+function derivedSecretFromServiceRole(): string | undefined {
+  refreshEnvForHostSecret();
+  const map = getEnvLocalMapFromDisk(process.cwd());
+  const sr =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    map.get("SUPABASE_SERVICE_ROLE_KEY")?.trim() ||
+    map.get("SUPABASE_SECRET_KEY")?.trim();
+  if (!sr) return undefined;
+  return createHash("sha256")
+    .update(`cafe_menu_host_cookie_v1:${sr}`, "utf8")
+    .digest("hex");
+}
+
+let warnedRoomHostFallback = false;
+
+/**
+ * 1) ROOM_HOST_SECRET 우선
+ * 2) 없으면 서비스 롤 키로 결정적 파생(개발·운영 공통 — ROOM_HOST_SECRET 미설정 시 500 방지)
+ * 3) 그것도 없으면 약한 고정 폴백(로그만 남김)
+ */
 function getSecret(): string {
-  const s = process.env.ROOM_HOST_SECRET;
-  if (!s || !s.trim()) {
-    throw new Error("ROOM_HOST_SECRET 환경 변수를 설정해 주세요.");
+  const explicit = process.env.ROOM_HOST_SECRET?.trim();
+  if (explicit) return explicit;
+
+  const derived = derivedSecretFromServiceRole();
+  if (derived) {
+    if (!warnedRoomHostFallback) {
+      warnedRoomHostFallback = true;
+      console.warn(
+        "[host-auth-cookie] ROOM_HOST_SECRET 미설정 — SUPABASE_SERVICE_ROLE_KEY 기반 파생 시크릿을 사용합니다. 배포 환경에서는 ROOM_HOST_SECRET 을 별도로 설정하는 것을 권장합니다.",
+      );
+    }
+    return derived;
   }
-  return s.trim();
+
+  if (!warnedRoomHostFallback) {
+    warnedRoomHostFallback = true;
+    console.error(
+      "[host-auth-cookie] ROOM_HOST_SECRET 및 Supabase 서비스 키가 모두 없어 약한 폴백 시크릿을 사용합니다. 즉시 환경 변수를 설정하세요.",
+    );
+  }
+  return "__cafe_menu_host_cookie_fallback_no_keys__";
 }
 
 /** roomId|expMs|hmacHex */
@@ -43,16 +91,25 @@ export function verifyHostRoomToken(token: string): string | null {
   }
 }
 
+/**
+ * Secure 플래그: `ROOM_HOST_COOKIE_SECURE=true` 이면 production 여부와 관계없이 Secure.
+ * `false` 이면 항상 생략. 미설정이면 production 에서만 Secure.
+ */
+function cookieSecureDirective(): string {
+  if (process.env.ROOM_HOST_COOKIE_SECURE === "false") return "";
+  if (process.env.ROOM_HOST_COOKIE_SECURE === "true") return "; Secure";
+  if (process.env.NODE_ENV === "production") return "; Secure";
+  return "";
+}
+
 export function hostAuthCookieHeader(roomId: string): string {
   const token = signHostRoomToken(roomId);
   const maxAge = 7 * 24 * 60 * 60;
-  const secure =
-    process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
+  const secure = cookieSecureDirective();
+  return `${COOKIE_NAME}=${encodeURIComponent(token)}; ${HOST_AUTH_COOKIE_FIXED}; Max-Age=${maxAge}${secure}`;
 }
 
 export function hostAuthClearCookieHeader(): string {
-  const secure =
-    process.env.NODE_ENV === "production" ? "; Secure" : "";
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure}`;
+  const secure = cookieSecureDirective();
+  return `${COOKIE_NAME}=; ${HOST_AUTH_COOKIE_FIXED}; Max-Age=0${secure}`;
 }

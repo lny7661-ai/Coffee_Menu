@@ -1,10 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  createBrowserSupabaseClient,
-  isSupabaseConfigured,
-} from "@/lib/supabase/client";
+import { useCafeSupabaseConfigured } from "@/lib/cafe/cafe-runtime-context";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { combineCartLinesForOrder } from "@/lib/menu";
 
 export type CartSubmitLine = {
@@ -38,6 +36,7 @@ export function MenuOrderForm({
   existingOrderId,
   onSubmitted,
 }: MenuOrderFormProps) {
+  const supabaseConfigured = useCafeSupabaseConfigured();
   const queryClient = useQueryClient();
   const isUpdate = Boolean(existingOrderId);
 
@@ -46,7 +45,7 @@ export function MenuOrderForm({
       if (hostPreview) {
         throw new Error("주최자 미리보기 모드에서는 저장할 수 없습니다. 카카오 로그인 후 주문해 주세요.");
       }
-      if (!isSupabaseConfigured()) {
+      if (!supabaseConfigured) {
         throw new Error("Supabase 환경 변수를 .env.local 에 설정해 주세요.");
       }
       const supabase = createBrowserSupabaseClient();
@@ -89,7 +88,7 @@ export function MenuOrderForm({
     },
   });
 
-  const supabaseReady = isSupabaseConfigured();
+  const supabaseReady = supabaseConfigured;
   const blocked = sessionClosed || hostPreview;
 
   return (

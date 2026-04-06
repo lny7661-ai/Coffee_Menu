@@ -1,7 +1,7 @@
 "use client";
 
 import { Lock } from "lucide-react";
-import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { useCafeSupabaseConfigured } from "@/lib/cafe/cafe-runtime-context";
 import {
   useCloseSessionMutation,
   useSessionClosure,
@@ -14,7 +14,7 @@ type HostSessionCloseButtonProps = {
 export function HostSessionCloseButton({ sessionId }: HostSessionCloseButtonProps) {
   const { data: closedAt, isLoading } = useSessionClosure(sessionId);
   const mutation = useCloseSessionMutation(sessionId);
-  const configured = isSupabaseConfigured();
+  const configured = useCafeSupabaseConfigured();
 
   if (!configured) {
     return (

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import {
+  ensureKakaoInitializedFromWindow,
   getKakaoJavaScriptKey,
   initKakaoSdkWhenReady,
 } from "@/lib/kakao/init-kakao-sdk";
@@ -39,7 +40,8 @@ export function KakaoShareButton({
     window.addEventListener("kakao-sdk-ready", markReadyIfKakao);
 
     void (async () => {
-      const ok = await initKakaoSdkWhenReady();
+      let ok = await initKakaoSdkWhenReady();
+      if (!ok) ok = ensureKakaoInitializedFromWindow();
       if (!cancelled && ok) setReady(true);
     })();
 

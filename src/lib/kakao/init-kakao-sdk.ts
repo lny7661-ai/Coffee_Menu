@@ -1,14 +1,13 @@
 /**
- * 카카오 JavaScript SDK 초기화.
- * 키는 코드에 직접 넣지 않고 `NEXT_PUBLIC_KAKAO_JS_KEY` 에서만 읽습니다.
- * (빌드 시점에 클라이언트 번들에 주입됨)
+ * 카카오 JavaScript 키 — 브라우저에서는 layout `<head>` 가 심은 `window.__CAFE_KAKAO_JS_KEY__` 만 사용.
  */
 
 export function getKakaoJavaScriptKey(): string | undefined {
-  const key = process.env.NEXT_PUBLIC_KAKAO_JS_KEY;
-  if (typeof key !== "string") return undefined;
-  const trimmed = key.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  if (typeof window === "undefined") return undefined;
+  const injected = window.__CAFE_KAKAO_JS_KEY__;
+  if (typeof injected !== "string") return undefined;
+  const t = injected.trim();
+  return t.length > 0 ? t : undefined;
 }
 
 /**
@@ -34,11 +33,12 @@ export function initKakaoSdkWhenReady(): Promise<boolean> {
 
     const tryInit = (Kakao: NonNullable<typeof window.Kakao>) => {
       try {
-        if (!Kakao.isInitialized()) {
-          Kakao.init(key);
+        if (Kakao.isInitialized()) {
+          return true;
         }
+        Kakao.init(key);
       } catch {
-        return false;
+        return Kakao.isInitialized();
       }
       return Kakao.isInitialized();
     };
@@ -57,4 +57,52 @@ export function initKakaoSdkWhenReady(): Promise<boolean> {
       }
     }, tickMs);
   });
+}
+
+/**
+ * 로그인 직전: 키가 있고, SDK가 있으면 `isInitialized()` 가 false 일 때만 `init` 호출.
+ */
+export function ensureKakaoInitializedFromWindow(): boolean {
+  if (typeof window === "undefined") return false;
+  const key = getKakaoJavaScriptKey();
+  if (!key) return false;
+  const Kakao = window.Kakao;
+  if (!Kakao) return false;
+  try {
+    if (!Kakao.isInitialized()) {
+      Kakao.init(key);
+    }
+  } catch {
+    return Kakao.isInitialized();
+  }
+  return Kakao.isInitialized();
+}
+
+/** 폴링으로 SDK 로드 대기 후, 필요 시에만 init. 로그인 직전 반드시 호출. */
+export async function ensureKakaoReadyForLogin(): Promise<void> {
+  if (typeof window === "undefined") {
+    throw new Error("카카오 로그인은 브라우저에서만 가능합니다.");
+  }
+  if (!getKakaoJavaScriptKey()) {
+    throw new Error(
+      "window.__CAFE_KAKAO_JS_KEY__ 가 없습니다. layout head 주입·Vercel 환경 변수를 확인하세요.",
+    );
+  }
+
+  const polled = await initKakaoSdkWhenReady();
+  const Kakao = window.Kakao;
+  if (!Kakao) {
+    throw new Error(
+      "window.Kakao 가 없습니다. SDK 스크립트 로드·네트워크 차단을 확인하세요.",
+    );
+  }
+  if (polled && Kakao.isInitialized()) {
+    return;
+  }
+  if (ensureKakaoInitializedFromWindow() && window.Kakao?.isInitialized()) {
+    return;
+  }
+  throw new Error(
+    "카카오 SDK 를 초기화하지 못했습니다. JavaScript 키·Web 도메인 등록을 확인하세요.",
+  );
 }

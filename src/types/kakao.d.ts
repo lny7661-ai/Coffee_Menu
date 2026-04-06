@@ -31,6 +31,10 @@ export type KakaoUserMeResponse = {
 type KakaoAuthLoginOptions = {
   success?: (authObj: unknown) => void;
   fail?: (err: unknown) => void;
+  /** 예: profile_nickname — 닉네임 동의 */
+  scope?: string;
+  /** 카카오톡 앱 로그인 유도 등 */
+  throughTalk?: boolean;
 };
 
 type KakaoApiRequestOptions = {
@@ -41,6 +45,8 @@ type KakaoApiRequestOptions = {
 
 declare global {
   interface Window {
+    /** RootLayout 인라인 스크립트로 주입(공개 JS 키) */
+    __CAFE_KAKAO_JS_KEY__?: string;
     Kakao?: {
       init: (key: string) => void;
       isInitialized: () => boolean;

@@ -1,16 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { createBrowserSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import { useCafeSupabaseConfigured } from "@/lib/cafe/cafe-runtime-context";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { OrderRow } from "@/lib/types";
 
 export function useMyOrder(sessionId: string, kakaoId: string | null) {
+  const supabaseConfigured = useCafeSupabaseConfigured();
   return useQuery({
     queryKey: ["myOrder", sessionId, kakaoId],
     enabled:
       Boolean(sessionId) &&
       Boolean(kakaoId) &&
-      isSupabaseConfigured(),
+      supabaseConfigured,
     queryFn: async (): Promise<OrderRow | null> => {
       const supabase = createBrowserSupabaseClient();
       const { data, error } = await supabase

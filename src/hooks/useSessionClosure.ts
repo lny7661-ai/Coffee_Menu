@@ -2,15 +2,8 @@
 
 import { useQuery, useQueryClient, useMutation, useQueries } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
-import {
-  createBrowserSupabaseClient,
-  isSupabaseConfigured,
-} from "@/lib/supabase/client";
-
-function getClient() {
-  if (!isSupabaseConfigured()) return null;
-  return createBrowserSupabaseClient();
-}
+import { useCafeSupabaseConfigured } from "@/lib/cafe/cafe-runtime-context";
+import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 
 function stableSortedRoomIdsKey(roomIds: string[]): string {
   return [...new Set(roomIds.filter(Boolean))].sort().join("\u0001");
@@ -18,13 +11,14 @@ function stableSortedRoomIdsKey(roomIds: string[]): string {
 
 /** 여러 방의 마감 여부(모집완료)를 한 번에 조회 */
 export function useSessionClosuresMap(roomIds: string[]) {
+  const supabaseConfigured = useCafeSupabaseConfigured();
   const idsKey = stableSortedRoomIdsKey(roomIds);
   const ids = useMemo(() => idsKey.split("\u0001").filter(Boolean), [idsKey]);
 
   const queries = useQueries({
     queries: ids.map((sessionId) => ({
       queryKey: ["sessionClosure", sessionId] as const,
-      enabled: Boolean(sessionId) && isSupabaseConfigured(),
+      enabled: Boolean(sessionId) && supabaseConfigured,
       queryFn: async (): Promise<string | null> => {
         const supabase = createBrowserSupabaseClient();
         const { data, error } = await supabase
@@ -54,11 +48,12 @@ export function useSessionClosuresMap(roomIds: string[]) {
 }
 
 export function useSessionClosure(sessionId: string) {
+  const supabaseConfigured = useCafeSupabaseConfigured();
   const queryClient = useQueryClient();
 
   const query = useQuery({
     queryKey: ["sessionClosure", sessionId],
-    enabled: Boolean(sessionId) && isSupabaseConfigured(),
+    enabled: Boolean(sessionId) && supabaseConfigured,
     queryFn: async (): Promise<string | null> => {
       const supabase = createBrowserSupabaseClient();
       const { data, error } = await supabase
@@ -75,9 +70,8 @@ export function useSessionClosure(sessionId: string) {
   });
 
   useEffect(() => {
-    if (!sessionId) return;
-    const supabase = getClient();
-    if (!supabase) return;
+    if (!sessionId || !supabaseConfigured) return;
+    const supabase = createBrowserSupabaseClient();
 
     const channel = supabase
       .channel(`session-closure-${sessionId}`)
@@ -100,17 +94,18 @@ export function useSessionClosure(sessionId: string) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [sessionId, queryClient]);
+  }, [sessionId, queryClient, supabaseConfigured]);
 
   return query;
 }
 
 export function useCloseSessionMutation(sessionId: string) {
+  const supabaseConfigured = useCafeSupabaseConfigured();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async () => {
-      if (!isSupabaseConfigured()) {
+      if (!supabaseConfigured) {
         throw new Error("Supabase 가 설정되어 있어야 마감할 수 있어요.");
       }
       const supabase = createBrowserSupabaseClient();
