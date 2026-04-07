@@ -92,13 +92,15 @@ export function verifyHostRoomToken(token: string): string | null {
 }
 
 /**
- * Secure 플래그: `ROOM_HOST_COOKIE_SECURE=true` 이면 production 여부와 관계없이 Secure.
- * `false` 이면 항상 생략. 미설정이면 production 에서만 Secure.
+ * Secure 플래그: `ROOM_HOST_COOKIE_SECURE=true` 이면 항상 Secure.
+ * `false` 이면 항상 생략. 미설정이면 Vercel 프로덕션(`VERCEL`)에서만 기본 Secure.
+ * 로컬 `next start`(NODE_ENV=production, HTTP)에서는 Secure 를 붙이지 않음.
  */
 function cookieSecureDirective(): string {
   if (process.env.ROOM_HOST_COOKIE_SECURE === "false") return "";
   if (process.env.ROOM_HOST_COOKIE_SECURE === "true") return "; Secure";
-  if (process.env.NODE_ENV === "production") return "; Secure";
+  if (process.env.NODE_ENV !== "production") return "";
+  if (process.env.VERCEL) return "; Secure";
   return "";
 }
 

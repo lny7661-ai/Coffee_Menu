@@ -93,7 +93,8 @@ export function mergeEnvLocalFromDisk(cwd: string = process.cwd()): void {
       (key === "SUPABASE_SERVICE_ROLE_KEY" ||
         key === "SUPABASE_SECRET_KEY" ||
         key === "NEXT_PUBLIC_SUPABASE_URL" ||
-        key === "NEXT_PUBLIC_SUPABASE_ANON_KEY");
+        key === "NEXT_PUBLIC_SUPABASE_ANON_KEY" ||
+        key === "NEXT_PUBLIC_SITE_URL");
     if (forceInDev || envIsEffectivelyEmpty(cur)) {
       try {
         process.env[key] = val;

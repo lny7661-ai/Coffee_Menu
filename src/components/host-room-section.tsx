@@ -11,7 +11,14 @@ import {
   updateSavedSessionLabel,
 } from "@/lib/saved-sessions";
 
-export function HostRoomSection() {
+declare global {
+  interface Window {
+    /** DEBUG: 진단 후 제거 — 콘솔에서 `await window.createRoom?.()` 호출용 */
+    createRoom?: () => Promise<void>;
+  }
+}
+
+function HostRoomSectionInner() {
   /** null = 아직 확인 전 · POST /api/rooms 와 동일한 라우트에서만 판별 */
   const [backendReady, setBackendReady] = useState<boolean | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -83,6 +90,11 @@ export function HostRoomSection() {
   }, [sessionId]);
 
   const createRoom = useCallback(async () => {
+    /* DEBUG: 진단 후 제거 — 클릭·조기 return·fetch 직전 구간 추적 */
+    if (typeof window !== "undefined") {
+      window.alert("1. 함수 진입 성공");
+    }
+
     console.log("[host-room] createRoom: enter", {
       sessionId,
       createPending,
@@ -101,6 +113,11 @@ export function HostRoomSection() {
 
     const pw = roomPassword.trim();
     const pw2 = roomPasswordConfirm.trim();
+    console.log("2. 데이터 확인:", {
+      roomName: roomLabel,
+      password: pw,
+      passwordConfirm: pw2,
+    });
     console.log("[host-room] createRoom: 검증 — 비밀번호 길이", {
       pwLen: pw.length,
       confirmLen: pw2.length,
@@ -151,6 +168,9 @@ export function HostRoomSection() {
         room_name: label,
         passwordLen: pw.length,
       });
+      if (typeof window !== "undefined") {
+        window.alert("3. 이제 서버로 요청 보냄");
+      }
       const res = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -213,6 +233,10 @@ export function HostRoomSection() {
         { id },
       );
     } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if (typeof window !== "undefined") {
+        window.alert(`에러 발생: ${errMsg}`);
+      }
       console.error("[host-room] createRoom: stop — 네트워크 또는 예외", {
         name: e instanceof Error ? e.name : typeof e,
         message: e instanceof Error ? e.message : String(e),
@@ -236,6 +260,13 @@ export function HostRoomSection() {
       console.log("[host-room] createRoom: finally — createPending·createInFlight 해제 보장");
     }
   }, [hostName, roomLabel, roomPassword, roomPasswordConfirm]);
+
+  useEffect(() => {
+    window.createRoom = createRoom;
+    return () => {
+      delete window.createRoom;
+    };
+  }, [createRoom]);
 
   const copyParticipate = useCallback(async () => {
     if (!urls.participate || typeof navigator === "undefined") return;
@@ -304,7 +335,10 @@ export function HostRoomSection() {
               className="mt-4 rounded-xl border border-amber-200/90 bg-amber-50/90 p-3.5 text-sm text-amber-950"
               role="status"
             >
-              <p className="font-medium">방 만들기 서버 설정이 필요합니다</p>
+              <p className="font-semibold">설정이 필요합니다</p>
+              <p className="mt-1 text-sm font-medium text-amber-950/95">
+                방 만들기 서버(Supabase service) 환경 변수가 아직 갖춰지지 않았습니다.
+              </p>
               <p className="mt-2 text-xs leading-relaxed text-amber-900/90">
                 로컬에서는 프로젝트 루트의{" "}
                 <code className="rounded bg-amber-100/80 px-1 py-0.5 font-mono text-[11px]">
@@ -328,6 +362,10 @@ export function HostRoomSection() {
                 </code>
                 에 넣으면 됩니다.) 배포 환경에서는 호스팅 설정의 환경 변수에
                 동일하게 추가한 뒤 재배포하세요.
+              </p>
+              <p className="mt-3 text-xs font-medium text-amber-900">
+                아래 「방 만들기」는 눌러도 됩니다. 서버가 응답하면 오류 문구로 원인을 확인할 수
+                있어요.
               </p>
             </div>
           ) : null}
@@ -383,10 +421,13 @@ export function HostRoomSection() {
           ) : null}
           {/* sticky 헤더 등과 겹칠 때 클릭이 씹히는 경우 완화 */}
           <div className="relative z-[2] mt-4">
+            {/*
+              DEBUG: 하이드레이션·클릭 진단 중 — 원복 시 disabled={createPending}
+            */}
             <button
               type="button"
               data-host-room-create
-              disabled={createPending}
+              disabled={false}
               onClick={(ev) => {
                 console.log("[host-room] 방 만들기 버튼 onClick", {
                   disabled: ev.currentTarget.disabled,
@@ -434,4 +475,19 @@ export function HostRoomSection() {
       )}
     </section>
   );
+}
+
+/**
+ * 서버에서 본문을 그리지 않고, 브라우저 마운트 이후에만 내부를 렌더링해
+ * 하이드레이션 불일치로 onClick 이 붙지 않는 경우를 줄입니다.
+ */
+export function HostRoomSection() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted) {
+    return null;
+  }
+  return <HostRoomSectionInner />;
 }

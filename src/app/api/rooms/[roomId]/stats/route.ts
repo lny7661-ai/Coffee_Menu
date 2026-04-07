@@ -3,6 +3,7 @@ import { createServiceSupabaseClient, isServiceSupabaseConfigured } from "@/lib/
 import {
   aggregateMenuItemRows,
   formatStatsSentence,
+  type MenuStatLine,
 } from "@/lib/order-stats";
 
 export const runtime = "nodejs";
@@ -29,14 +30,28 @@ export async function GET(
       .from("orders")
       .select("menu_item")
       .eq("room_id", roomId);
-    if (error) throw error;
-    const lines = aggregateMenuItemRows((data ?? []) as { menu_item: string }[]);
+
+    if (error) {
+      console.error("[api/rooms/.../stats] Supabase:", error.message, error.code);
+      // 스키마 미적용·일시 오류여도 UI는 빈 통계로 유지
+      return NextResponse.json({
+        lines: [] as MenuStatLine[],
+        sentence: formatStatsSentence([]),
+      });
+    }
+
+    const lines = aggregateMenuItemRows(
+      (data ?? []) as { menu_item: string | null }[],
+    );
     return NextResponse.json({
       lines,
       sentence: formatStatsSentence(lines),
     });
   } catch (e) {
-    console.error(e);
-    return NextResponse.json({ error: "통계를 불러오지 못했습니다." }, { status: 500 });
+    console.error("[api/rooms/.../stats]", e);
+    return NextResponse.json({
+      lines: [] as MenuStatLine[],
+      sentence: formatStatsSentence([]),
+    });
   }
 }

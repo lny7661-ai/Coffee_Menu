@@ -4,11 +4,12 @@
 export type MenuStatLine = { label: string; count: number };
 
 export function aggregateMenuItemRows(
-  rows: { menu_item: string }[],
+  rows: { menu_item: string | null | undefined }[],
 ): MenuStatLine[] {
   const map = new Map<string, number>();
   for (const r of rows) {
-    const text = r.menu_item.trim();
+    const raw = r.menu_item;
+    const text = typeof raw === "string" ? raw.trim() : "";
     if (!text) continue;
     for (const rawLine of text.split("\n")) {
       const line = rawLine.trim();

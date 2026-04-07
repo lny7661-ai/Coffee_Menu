@@ -83,7 +83,12 @@ export async function ensureKakaoReadyForLogin(): Promise<void> {
   if (typeof window === "undefined") {
     throw new Error("카카오 로그인은 브라우저에서만 가능합니다.");
   }
-  if (!getKakaoJavaScriptKey()) {
+  const debug =
+    process.env.NODE_ENV === "development" ||
+    new URLSearchParams(window.location.search).get("debugKakao") === "1";
+
+  const key = getKakaoJavaScriptKey();
+  if (!key) {
     throw new Error(
       "window.__CAFE_KAKAO_JS_KEY__ 가 없습니다. layout head 주입·Vercel 환경 변수를 확인하세요.",
     );
@@ -101,6 +106,15 @@ export async function ensureKakaoReadyForLogin(): Promise<void> {
   }
   if (ensureKakaoInitializedFromWindow() && window.Kakao?.isInitialized()) {
     return;
+  }
+  if (debug) {
+    console.error("[Kakao SDK] ensureKakaoReadyForLogin 실패", {
+      hasKey: Boolean(key),
+      keyMasked: `${key.slice(0, 4)}…${key.slice(-4)}`,
+      hasWindowKakao: Boolean(Kakao),
+      polled,
+      isInitialized: Kakao?.isInitialized?.(),
+    });
   }
   throw new Error(
     "카카오 SDK 를 초기화하지 못했습니다. JavaScript 키·Web 도메인 등록을 확인하세요.",

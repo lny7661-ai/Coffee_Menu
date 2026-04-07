@@ -15,6 +15,10 @@ export function KakaoSdkScript() {
       src={KAKAO_SDK_SRC}
       strategy="afterInteractive"
       onLoad={() => {
+        const debug =
+          process.env.NODE_ENV === "development" ||
+          new URLSearchParams(window.location.search).get("debugKakao") === "1";
+
         const injected = window.__CAFE_KAKAO_JS_KEY__;
         const key = getKakaoJavaScriptKey();
         const Kakao = window.Kakao;
@@ -38,14 +42,37 @@ export function KakaoSdkScript() {
         }
 
         try {
+          if (debug) {
+            console.log("[Kakao SDK] onLoad: init 시도 전", {
+              hasInjectedKey:
+                typeof injected === "string" && injected.trim().length > 0,
+              keyMasked: `${key.slice(0, 4)}…${key.slice(-4)}`,
+              isInitializedBefore: Kakao.isInitialized(),
+            });
+          }
           if (!Kakao.isInitialized()) {
+            if (debug) {
+              // 사용자가 요청한 디버그 출력(마스킹 없이). 문제 해결 후 제거 권장.
+              console.log(
+                "실제 주입된 키:",
+                process.env.NEXT_PUBLIC_KAKAO_JS_KEY,
+              );
+            }
             Kakao.init(key);
           }
-        } catch (e) {
+          if (debug) {
+            console.log("[Kakao SDK] onLoad: init 후", {
+              isInitializedAfter: Kakao.isInitialized(),
+            });
+          }
+        } catch (err) {
           console.error(
             "[Kakao SDK] Kakao.init 실패 — 키 종류(JavaScript 키)·카카오 콘솔 Web 도메인 등록을 확인하세요.",
-            e,
+            err,
           );
+          if (debug) {
+            console.dir(err);
+          }
           return;
         }
 

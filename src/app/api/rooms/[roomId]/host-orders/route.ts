@@ -8,6 +8,7 @@ import {
 } from "@/lib/host-auth-cookie";
 import { fetchOrdersForRoom } from "@/lib/server/fetch-room-orders";
 import { verifyRoomHostPassword } from "@/lib/server/verify-room-host-password";
+import { normalizeRoomIdForAuth } from "@/lib/server/normalize-room-id";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,9 @@ export async function GET(
   const raw = jar.get(COOKIE_NAME)?.value;
   const token = raw ? decodeURIComponent(raw) : "";
   const verifiedRoomId = token ? verifyHostRoomToken(token) : null;
-  if (verifiedRoomId !== roomId) {
+  const want = normalizeRoomIdForAuth(roomId);
+  const got = verifiedRoomId ? normalizeRoomIdForAuth(verifiedRoomId) : null;
+  if (!got || got !== want) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 

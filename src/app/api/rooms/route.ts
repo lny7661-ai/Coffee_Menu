@@ -33,7 +33,10 @@ export async function POST(req: Request) {
   if (!configured) {
     log("stop — 환경 변수: NEXT_PUBLIC_SUPABASE_URL 또는 SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SECRET_KEY 없음");
     return NextResponse.json(
-      { error: "서버에 Supabase service role 이 설정되지 않았습니다." },
+      {
+        error: "서버에 Supabase service role 이 설정되지 않았습니다.",
+        hint: ".env.local 에 NEXT_PUBLIC_SUPABASE_URL 과 SUPABASE_SERVICE_ROLE_KEY(또는 SUPABASE_SECRET_KEY) 를 넣고 개발 서버를 다시 시작하세요.",
+      },
       { status: 503 },
     );
   }

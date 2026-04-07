@@ -55,7 +55,20 @@ export function HostRoomDashboard({ roomId }: { roomId: string }) {
       const r = await fetch(`/api/rooms/${roomId}/host-orders`, {
         credentials: "include",
       });
-      if (r.status === 401) return "unauthorized";
+      if (r.status === 401) {
+        // 비밀번호 로그인 직후 캐시에 명단이 있는데 폴링만 401이면 덮어쓰지 않음(쿠키 지연·SameSite 등)
+        const prev = queryClient.getQueryData<
+          HostOrdersPayload | "unauthorized"
+        >(["hostOrders", roomId]);
+        if (
+          prev &&
+          prev !== "unauthorized" &&
+          Array.isArray(prev.orders)
+        ) {
+          return prev;
+        }
+        return "unauthorized";
+      }
       if (!r.ok) {
         const j = (await r.json().catch(() => ({}))) as { error?: string };
         throw new Error(j.error ?? "목록을 불러오지 못했습니다.");
@@ -63,7 +76,11 @@ export function HostRoomDashboard({ roomId }: { roomId: string }) {
       return r.json() as Promise<HostOrdersPayload>;
     },
     retry: false,
-    refetchInterval: 8000,
+    refetchInterval: (query) => {
+      const d = query.state.data;
+      if (!d || d === "unauthorized") return false;
+      return 8000;
+    },
   });
 
   const loginMutation = useMutation({
@@ -86,6 +103,7 @@ export function HostRoomDashboard({ roomId }: { roomId: string }) {
       setPassword("");
       setPwError(null);
       queryClient.setQueryData(["hostOrders", roomId], data);
+      await queryClient.invalidateQueries({ queryKey: ["hostOrders", roomId] });
     },
     onError: (e: Error) => {
       setPwError(e.message);
@@ -137,6 +155,12 @@ export function HostRoomDashboard({ roomId }: { roomId: string }) {
           <p className="mt-3 text-sm font-medium leading-relaxed text-zinc-100">
             {statsQuery.data?.sentence ?? ""}
           </p>
+          {!statsQuery.data?.lines?.length ? (
+            <p className="mt-2 text-xs text-zinc-400">
+              아직 주문 내역이 없습니다. 참가자가 주문하면 여기에 메뉴별 잔 수가
+              집계돼요.
+            </p>
+          ) : null}
           {statsQuery.data?.lines && statsQuery.data.lines.length > 0 ? (
             <ul className="mt-4 space-y-2 border-t border-zinc-700/80 pt-4 text-sm">
               {statsQuery.data.lines.map(({ label, count }) => (

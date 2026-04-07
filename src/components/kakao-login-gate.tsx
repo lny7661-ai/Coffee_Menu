@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { MessageCircle } from "lucide-react";
 import { loginWithKakao } from "@/lib/kakao/kakao-auth";
 import type { KakaoParticipantProfile } from "@/lib/kakao/kakao-auth";
 import { getKakaoJavaScriptKey } from "@/lib/kakao/init-kakao-sdk";
+import { ensureKakaoReadyForLogin } from "@/lib/kakao/init-kakao-sdk";
 
 type KakaoLoginGateProps = {
   sessionClosed: boolean;
@@ -18,9 +20,59 @@ export function KakaoLoginGate({
   onBrowseWithoutLogin,
 }: KakaoLoginGateProps) {
   const hasKey = Boolean(getKakaoJavaScriptKey());
+  const debug =
+    process.env.NODE_ENV === "development" ||
+    (typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("debugKakao") === "1");
+
+  useEffect(() => {
+    console.log("Login Page Mounted");
+  }, []);
+
+  const handleTestDirectAuthLogin = async () => {
+    try {
+      console.log("[Kakao TEST] origin:", window.location.origin);
+      // 요청대로 redirectUri 를 현재 origin 기준으로 강제(예: http://localhost:3000/auth/callback)
+      const redirectUri = `${window.location.origin.replace(/\/$/, "")}/auth/callback`;
+      console.log("[Kakao TEST] redirectUri:", redirectUri);
+
+      await ensureKakaoReadyForLogin();
+      const Kakao = window.Kakao;
+      console.log("Kakao Auth 객체 상태:", Kakao?.Auth);
+
+      if (!Kakao?.Auth?.authorize) {
+        window.alert("window.Kakao.Auth.authorize 를 찾지 못했습니다.");
+        return;
+      }
+
+      Kakao.Auth.authorize({
+        scope: "profile_nickname",
+        redirectUri,
+      });
+      window.alert(
+        "Kakao.Auth.authorize 호출 완료 — 이제 redirectUri로 이동하는지/팝업의 에러가 무엇인지 확인하세요.",
+      );
+    } catch (e) {
+      console.error("[Kakao TEST] 예외:", e);
+      window.alert(
+        e instanceof Error ? e.message : "카카오 테스트 로그인 중 오류가 발생했습니다.",
+      );
+    }
+  };
 
   const handleLogin = async () => {
+    // 임시 클릭 이벤트 확인용: URL에 ?debugClick=1 이 있으면 alert만 띄우고 로그인 실행은 막음
+    if (typeof window !== "undefined") {
+      const qs = new URLSearchParams(window.location.search);
+      if (qs.get("debugClick") === "1") {
+        window.alert("버튼 작동 확인");
+        return;
+      }
+    }
+
     try {
+      // 카카오 콘솔에 등록된 도메인과 1:1 일치해야 함(토씨 하나 포함)
+      console.log("현재 브라우저 origin:", window.location.origin);
       const p = await loginWithKakao();
       onLoggedIn(p);
     } catch (e) {
@@ -51,7 +103,7 @@ export function KakaoLoginGate({
         </p>
         {!hasKey ? (
           <p className="mt-4 text-xs text-amber-700">
-            NEXT_PUBLIC_KAKAO_JS_KEY 가 필요합니다.
+            window.__CAFE_KAKAO_JS_KEY__(Vercel NEXT_PUBLIC_KAKAO_JS_KEY)가 필요합니다.
           </p>
         ) : (
           <button
@@ -63,6 +115,15 @@ export function KakaoLoginGate({
             카카오로 로그인하고 시작하기
           </button>
         )}
+        {debug ? (
+          <button
+            type="button"
+            onClick={handleTestDirectAuthLogin}
+            className="mt-3 w-full rounded-xl border-2 border-red-300 bg-white py-3 text-sm font-bold text-red-700 transition hover:bg-red-50"
+          >
+            (테스트) Kakao.Auth.authorize 직접 호출
+          </button>
+        ) : null}
         {onBrowseWithoutLogin ? (
           <button
             type="button"
